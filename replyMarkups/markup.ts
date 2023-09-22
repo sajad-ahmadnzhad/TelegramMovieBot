@@ -3,12 +3,12 @@ let startBot = {
   reply_markup: {
     inline_keyboard: [
       [
-        { text: "فیلمهای هالیوود", callback_data: "HollywoodMovie" },
-        { text: "فیلمهای بالیوود", callback_data: "BollywoodMovie" },
+        { text: "فیلمهای هالیوود", callback_data: "Hollywood" },
+        { text: "فیلمهای بالیوود", callback_data: "Bollywood" },
       ],
       [
-        { text: "فیلمهای ایرانی", callback_data: "IranianMovie" },
-        { text: "فیلمهای ترکی", callback_data: "TurkishMovie" },
+        { text: "فیلمهای ایرانی", callback_data: "Iranian" },
+        { text: "فیلمهای ترکی", callback_data: "Turkish" },
       ],
     ],
   },
@@ -19,14 +19,14 @@ let genreMovie = (Industry: string = "") => {
     reply_markup: {
       inline_keyboard: [
         [
-          { text: "اکشن", callback_data: `${Industry} Action` },
-          { text: "عاشقانه", callback_data: `${Industry} Romantic` },
-          { text: "کمدی", callback_data: `${Industry} Comedy` },
+          { text: "اکشن", callback_data: `${Industry} اکشن` },
+          { text: "عاشقانه", callback_data: `${Industry} عاشقانه` },
+          { text: "کمدی", callback_data: `${Industry} کمدی` },
         ],
         [
-          { text: "ترسناک", callback_data: `${Industry} Scary` },
-          { text: "بیوگرافی", callback_data: `${Industry} Biography` },
-          { text: "درام", callback_data: `${Industry} Drama` },
+          { text: "ترسناک", callback_data: `${Industry} ترسناک` },
+          { text: "بیوگرافی", callback_data: `${Industry} بیوگرافی` },
+          { text: "درام", callback_data: `${Industry} درام` },
         ],[
             { text: "برگشت", callback_data: `backToListIndustrys` },
         ]

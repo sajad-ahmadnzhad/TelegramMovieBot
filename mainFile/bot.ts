@@ -1,27 +1,28 @@
 import TelegramBot from "node-telegram-bot-api";
 require("../config/db");
-require('dotenv').config()
+require("dotenv").config();
 let { messageStartBot } = require("../messagesBot/message");
 let { startBot, genreMovie } = require("../replyMarkups/markup");
 let { movies } = require("../models/movieModel");
-let token = process.env.BOT_TOKEN as string || "6475062422:AAHuBVOZqgUdQNj_Tu0NpHpLhXNj53Xgang";
-
+let token =
+  (process.env.BOT_TOKEN as string) ||
+  "6475062422:AAHuBVOZqgUdQNj_Tu0NpHpLhXNj53Xgang";
 class StartBot {
   protected bot: TelegramBot;
   constructor(protected token: string) {
     this.bot = new TelegramBot(token, { polling: true });
-  }
-
-  sendMessage(): void {
-    this.bot.onText(/\/start/, (msg) => {
-      let id = msg.from!.id;
-      this.bot.sendMessage(id, messageStartBot(msg.from?.first_name), startBot);
-    });
     this.cllbackQueryHandler();
   }
 
+  sendMessage(): void {
+    this.bot.onText(/\/start/, async (msg) => {
+      let id = msg.from!.id;
+      this.bot.sendMessage(id, messageStartBot(msg.from?.first_name), startBot);
+    });
+  }
+
   cllbackQueryHandler() {
-    this.bot.on("callback_query", (msg) => {
+    this.bot.on("callback_query", async (msg) => {
       let data = msg.data;
       let id = msg.from.id;
       this.bot.answerCallbackQuery(msg.id);
@@ -33,24 +34,21 @@ class StartBot {
 
       resultMarkup.flat(Infinity).forEach((item: { callback_data: string }) => {
         let message = "ژانر مورد نظر را انتخاب نمایید";
-        switch (data) {
-          case item.callback_data:
+        if (data == item.callback_data) {
           this.bot.editMessageText(message, {
             reply_markup: genreMovie(data).reply_markup,
             chat_id: id,
             message_id: msg.message?.message_id,
           });
-            break;
         }
       });
-      switch (data) {
-        case "backToListIndustrys":
-          this.bot.editMessageText(messageStartBot(msg.from.first_name), {
-            reply_markup: startBot.reply_markup,
-            chat_id: id,
-            message_id: msg.message?.message_id,
-          });
-          break;
+
+      if (data == "backToListIndustrys") {
+        this.bot.editMessageText(messageStartBot(msg.from.first_name), {
+          reply_markup: startBot.reply_markup,
+          chat_id: id,
+          message_id: msg.message?.message_id,
+        });
       }
     });
   }
@@ -108,5 +106,48 @@ class AdminMessage extends StartBot {
   }
 }
 
-let adminMessage = new AdminMessage(token);
-adminMessage.messageAdminHandler();
+class SendMovie extends AdminMessage {
+  constructor(token: string) {
+    super(token);
+    this.messageAdminHandler();
+  }
+
+  sendMovieData(): void {
+    this.bot.on("callback_query", async (msg) => {
+      let id = msg.from!.id;
+      let data = msg.data;
+
+      let findMovie = await movies.findOne({ movieName: data });
+      if (findMovie) {
+        this.bot.sendPhoto(id, findMovie.moviePhoto, {
+          caption: findMovie.movieCaption,
+        });
+      }
+
+      let splitData = data?.split(" ");
+      if (splitData?.length == 2) {
+        let findData = await movies.find({
+          movieIndustry: splitData![0].toLocaleLowerCase(),
+        });
+        if (findData.length == 0) return;
+        let inline_keyboard: any = [];
+
+        for (const item of findData) {
+          if (item.movieGenre.includes(splitData![1])) {
+            inline_keyboard.push([
+              { text: item.movieName, callback_data: item.movieName },
+            ]);
+          }
+        }
+        let message = `فیلمایی با ژانر ${splitData[1]}:`;
+        this.bot.sendMessage(id, message, {
+          reply_markup: { inline_keyboard },
+        });
+      }
+    });
+  }
+}
+
+let sendMovie = new SendMovie(token);
+
+sendMovie.sendMovieData();
