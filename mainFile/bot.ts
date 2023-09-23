@@ -2,7 +2,11 @@ import TelegramBot from "node-telegram-bot-api";
 require("../config/db");
 require("dotenv").config();
 let { messageStartBot } = require("../messagesBot/message");
-let { startBot, genreMovie } = require("../replyMarkups/markup");
+let {
+  startBot,
+  genreMovie,
+  sendMovieOption,
+} = require("../replyMarkups/markup");
 let { movies } = require("../models/movieModel");
 let token =
   (process.env.BOT_TOKEN as string) ||
@@ -32,8 +36,8 @@ class StartBot {
         resultMarkup = JSON.parse(startBot.reply_markup).inline_keyboard;
       else resultMarkup = startBot.reply_markup.inline_keyboard;
 
+      let message = "ژانر مورد نظر را انتخاب نمایید";
       resultMarkup.flat(Infinity).forEach((item: { callback_data: string }) => {
-        let message = "ژانر مورد نظر را انتخاب نمایید";
         if (data == item.callback_data) {
           this.bot.editMessageText(message, {
             reply_markup: genreMovie(data).reply_markup,
@@ -57,9 +61,9 @@ class StartBot {
 class AdminMessage extends StartBot {
   constructor(token: string) {
     super(token);
+    this.sendMessage();
   }
   messageAdminHandler() {
-    this.sendMessage();
     this.bot.on("message", async (msg) => {
       let id = msg.from!.id;
       if (id == 1088935787 && msg.photo && msg.caption) {
@@ -75,7 +79,7 @@ class AdminMessage extends StartBot {
             return this.bot.sendMessage(id, "invalid name movie");
           let movieName = matchMovie![1];
 
-          if (!movieName || movieName.length < 2)
+          if (!movieName || movieName.length < 4)
             return this.bot.sendMessage(id, "نام فیلم معتبر نیست");
 
           let regexGenre = /ژانر: (.+)/;
@@ -87,17 +91,23 @@ class AdminMessage extends StartBot {
             return this.bot.sendMessage(id, message);
           }
 
+          let regexLinkDownload = /linkDownload: (.+)/;
+          let matchLink = msg.caption!.match(regexLinkDownload);
+          let message = "ادمین عزیز لطفا لینک دانلود را اضافه کنید";
+          if (!matchLink) return this.bot.sendMessage(id, message);
+          let movieLinkDownload = matchLink![1];
+          msg.caption = msg.caption.replace(/linkDownload:.*/g, "");
+
           await movies.create({
             movieName,
             movieGenre,
             moviePhoto: msg.photo[0].file_id,
             movieCaption: msg.caption,
             movieIndustry,
+            movieLinkDownload,
           });
-          this.bot.sendMessage(
-            id,
-            `فیلم ${movieName} با موفقیت در دیتابیس قرار گرفت`
-          );
+          let messageCreatedTODB = `فیلم ${movieName} با موفقیت در دیتابیس قرار گرفت`;
+          this.bot.sendMessage(id, messageCreatedTODB);
         } else {
           this.bot.sendMessage(id, "کپشن معتبر نیست");
         }
@@ -118,31 +128,46 @@ class SendMovie extends AdminMessage {
       let data = msg.data;
 
       let findMovie = await movies.findOne({ movieName: data });
-      if (findMovie) {
-        this.bot.sendPhoto(id, findMovie.moviePhoto, {
-          caption: findMovie.movieCaption,
-        });
-      }
+      if (findMovie)
+        this.bot.sendPhoto(
+          id,
+          findMovie.moviePhoto,
+          sendMovieOption(findMovie)
+        );
 
       let splitData = data?.split(" ");
       if (splitData?.length == 2) {
         let findData = await movies.find({
           movieIndustry: splitData![0].toLocaleLowerCase(),
         });
-        if (findData.length == 0) return;
-        let inline_keyboard: any = [];
+
+        if (!findData.length) return;
+        let inline_keyboard = [
+          [{ text: "بستن", callback_data: "closeListMovie" }],
+        ];
+        let row = [];
 
         for (const item of findData) {
           if (item.movieGenre.includes(splitData![1])) {
-            inline_keyboard.push([
-              { text: item.movieName, callback_data: item.movieName },
-            ]);
+            row.push({ text: item.movieName, callback_data: item.movieName });
+            if (row.length == 2) {
+              inline_keyboard.unshift(row);
+              row = [];
+            }
           }
         }
-        let message = `فیلمایی با ژانر ${splitData[1]}:`;
+
+        if (row.length == 1) inline_keyboard.unshift(row);
+        else if (inline_keyboard.length == 1)
+          return this.bot.sendMessage(id, "فیلمی قرار گرفته نشده");
+
+        let message = `فیلمهایی با ژانر ${splitData[1]}:`;
         this.bot.sendMessage(id, message, {
-          reply_markup: { inline_keyboard },
+          reply_markup: { inline_keyboard: inline_keyboard },
         });
+      }
+      if (data == "closeMovie" || data == "closeListMovie") {
+        this.bot.deleteMessage(id, msg.message?.message_id!);
       }
     });
   }

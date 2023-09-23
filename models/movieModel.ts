@@ -6,6 +6,7 @@ let movies = mongoose.model("movies" , {
     moviePhoto: {type: String , required: true},
     movieCaption: {type: String , required: true},
     movieIndustry: {type: String , required: true},
+    movieLinkDownload: {type: String , required: true},
 })
 
 module.exports = {movies}

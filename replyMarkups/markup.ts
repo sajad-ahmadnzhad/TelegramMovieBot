@@ -15,7 +15,7 @@ let startBot = {
 };
 
 let genreMovie = (Industry: string = "") => {
-  let data = {
+  return {
     reply_markup: {
       inline_keyboard: [
         [
@@ -27,14 +27,30 @@ let genreMovie = (Industry: string = "") => {
           { text: "ترسناک", callback_data: `${Industry} ترسناک` },
           { text: "بیوگرافی", callback_data: `${Industry} بیوگرافی` },
           { text: "درام", callback_data: `${Industry} درام` },
-        ],[
-            { text: "برگشت", callback_data: `backToListIndustrys` },
-        ]
+        ],
+        [{ text: "برگشت", callback_data: `backToListIndustrys` }],
       ],
     },
   };
-
-  return data;
 };
 
-module.exports = { startBot, genreMovie };
+interface PropertyMovie {
+  movieCaption: string;
+  movieLinkDownload: string;
+}
+
+let sendMovieOption = (findMovie: PropertyMovie) => {
+  return {
+    caption: findMovie.movieCaption,
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: "دانلود فیلم", url: findMovie.movieLinkDownload },
+          { text: "بستن", callback_data: "closeMovie" },
+        ],
+      ],
+    },
+  };
+};
+
+module.exports = { startBot, genreMovie , sendMovieOption };
