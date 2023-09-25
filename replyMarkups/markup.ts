@@ -1,4 +1,3 @@
-let movieModel = require("../models/movieModel");
 let startBot = {
   reply_markup: {
     inline_keyboard: [
@@ -14,7 +13,7 @@ let startBot = {
   },
 };
 
-let genreMovie = (Industry: string = "") => {
+let genreMovie = (Industry: string = ""): object => {
   return {
     reply_markup: {
       inline_keyboard: [
@@ -28,6 +27,11 @@ let genreMovie = (Industry: string = "") => {
           { text: "بیوگرافی", callback_data: `${Industry} بیوگرافی` },
           { text: "درام", callback_data: `${Industry} درام` },
         ],
+        [
+          { text: "خانوادگی", callback_data: `${Industry} خانوادگی` },
+          { text: "تخیلی", callback_data: `${Industry} تخیلی` },
+          { text: "ماجراجویی", callback_data: `${Industry} ماجراجویی` },
+        ],
         [{ text: "برگشت", callback_data: `backToListIndustrys` }],
       ],
     },
@@ -37,9 +41,10 @@ let genreMovie = (Industry: string = "") => {
 interface PropertyMovie {
   movieCaption: string;
   movieLinkDownload: string;
+  movieName: string;
 }
 
-let sendMovieOption = (findMovie: PropertyMovie) => {
+let sendMovieOption = async (findMovie: PropertyMovie) => {
   return {
     caption: findMovie.movieCaption,
     reply_markup: {

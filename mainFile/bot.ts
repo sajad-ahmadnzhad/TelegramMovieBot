@@ -1,13 +1,18 @@
 import TelegramBot from "node-telegram-bot-api";
 require("../config/db");
 require("dotenv").config();
-let { messageStartBot } = require("../messagesBot/message");
+let {
+  messageStartBot,
+  messageErrorQuality,
+  messageErrorLanguage,
+} = require("../messagesBot/message");
 let {
   startBot,
   genreMovie,
   sendMovieOption,
 } = require("../replyMarkups/markup");
 let { movies } = require("../models/movieModel");
+let { videoMovies } = require("../models/sendMovie");
 let token =
   (process.env.BOT_TOKEN as string) ||
   "6475062422:AAHuBVOZqgUdQNj_Tu0NpHpLhXNj53Xgang";
@@ -16,6 +21,14 @@ class StartBot {
   constructor(protected token: string) {
     this.bot = new TelegramBot(token, { polling: true });
     this.cllbackQueryHandler();
+  }
+
+  get id(): number {
+    return this.id
+  }
+
+  set id(id: number) {
+    this.id = id
   }
 
   sendMessage(): void {
@@ -63,11 +76,11 @@ class AdminMessage extends StartBot {
     super(token);
     this.sendMessage();
   }
-  messageAdminHandler() {
-    this.bot.on("message", async (msg) => {
+  getPhotoMovie(): void {
+    this.bot.on("photo", async (msg) => {
       let id = msg.from!.id;
-      if (id == 1088935787 && msg.photo && msg.caption) {
-        let industry = ["bollywood", "hollywood"];
+      if (id == 1088935787 && msg.caption) {
+        let industry = ["bollywood", "hollywood", "tranian", "turkish"];
         let movieIndustry = industry.find((item) =>
           msg.caption?.includes(item)
         );
@@ -101,16 +114,80 @@ class AdminMessage extends StartBot {
           await movies.create({
             movieName,
             movieGenre,
-            moviePhoto: msg.photo[0].file_id,
+            moviePhoto: msg.photo![0].file_id,
             movieCaption: msg.caption,
             movieIndustry,
             movieLinkDownload,
           });
           let messageCreatedTODB = `فیلم ${movieName} با موفقیت در دیتابیس قرار گرفت`;
           this.bot.sendMessage(id, messageCreatedTODB);
-        } else {
-          this.bot.sendMessage(id, "کپشن معتبر نیست");
         }
+      }
+    });
+  }
+
+  getVideoMovie() {
+    this.bot.on("video", async (msg) => {
+      let id = msg.from?.id as number;
+
+      if (id == 1088935787 && msg.caption) {
+        let movieCaption = msg.caption;
+        let movieId = msg.video?.file_id;
+
+        let regexMovieName = /Name Movie: (.+)/;
+        let matchMovieName = msg.caption?.match(regexMovieName);
+        let movieName = matchMovieName![1].trim();
+        if (!matchMovieName)
+          return this.bot.sendMessage(id, "نام این فیلم معتبر نیست", {
+            reply_to_message_id: msg.message_id,
+          });
+
+        let qualitys = ["480p", "720p", "1080p"];
+        let regexMovieQuality = /کیفیت: (.+)/;
+        let matchMovieQuality = msg.caption?.match(regexMovieQuality);
+        let includesQua = qualitys.includes(matchMovieQuality![1].trim());
+        let movieQuality = matchMovieQuality![1].trim();
+        if (!matchMovieQuality || !includesQua)
+          return this.bot.sendMessage(id, messageErrorQuality(qualitys), {
+            reply_to_message_id: msg.message_id,
+          });
+
+        let languages = ["#دوبله_فارسی", "#زیرنویس_چسبیده_فارسی"];
+        let regexMovieLanguage = /زبان: (.+)/;
+        let matchMovieLanguage = msg.caption?.match(regexMovieLanguage);
+        let movieLanguage = matchMovieLanguage![1]?.trim();
+        let includesLang = languages.includes(matchMovieLanguage![1].trim());
+
+        if (!matchMovieLanguage || !includesLang) {
+          return this.bot.sendMessage(id, messageErrorLanguage(languages), {
+            reply_to_message_id: msg.message_id,
+          });
+        }
+
+        let findData = await videoMovies.findOne({
+          movieName,
+          movieLanguage,
+          movieQuality,
+        });
+
+        if (findData) {
+          let message = "این فیلم از قبل در دیتابیس وجود دارد";
+          return this.bot.sendMessage(id, message, {
+            reply_to_message_id: msg.message_id,
+          });
+        }
+
+        await videoMovies.create({
+          movieName,
+          movieLanguage,
+          movieQuality,
+          movieCaption,
+          movieId,
+        });
+
+        this.bot.sendMessage(id, "با موفقیت در دیتابیس ذخیره شد", {
+          reply_to_message_id: msg.message_id,
+        });
       }
     });
   }
@@ -119,21 +196,23 @@ class AdminMessage extends StartBot {
 class SendMovie extends AdminMessage {
   constructor(token: string) {
     super(token);
-    this.messageAdminHandler();
+    this.getPhotoMovie();
+    this.getVideoMovie();
   }
 
   sendMovieData(): void {
     this.bot.on("callback_query", async (msg) => {
       let id = msg.from!.id;
       let data = msg.data;
-
       let findMovie = await movies.findOne({ movieName: data });
-      if (findMovie)
+
+      if (findMovie) {
         this.bot.sendPhoto(
           id,
           findMovie.moviePhoto,
-          sendMovieOption(findMovie)
+          await sendMovieOption(findMovie)
         );
+      }
 
       let splitData = data?.split(" ");
       if (splitData?.length == 2) {
@@ -163,11 +242,11 @@ class SendMovie extends AdminMessage {
 
         let message = `فیلمهایی با ژانر ${splitData[1]}:`;
         this.bot.sendMessage(id, message, {
-          reply_markup: { inline_keyboard: inline_keyboard },
+          reply_markup: { inline_keyboard },
         });
       }
       if (data == "closeMovie" || data == "closeListMovie") {
-        this.bot.deleteMessage(id, msg.message?.message_id!);
+        this.bot.deleteMessage(id, msg.message?.message_id as number);
       }
     });
   }
